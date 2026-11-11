@@ -27,6 +27,7 @@ public final class GlookoService: Service, ObservableObject {
         public var doses = 0
         public var carbs = 0
         public var pumpEvents = 0
+        public var pumpSnapshotBackfilled: Bool?
         public var failingSince: Date?
         public var activeAlerts: [String]?
     }
@@ -123,6 +124,8 @@ public final class GlookoService: Service, ObservableObject {
 
 extension GlookoService: RemotePumpSnapshotService {
 
+    public var needsPumpSnapshotBackfill: Bool { stats.pumpSnapshotBackfilled != true }
+
     public var glucoseDataLimit: Int? { 1000 }
     public var doseDataLimit: Int? { 1000 }
     public var carbDataLimit: Int? { 1000 }
@@ -173,7 +176,7 @@ extension GlookoService: RemotePumpSnapshotService {
     public func remoteNotificationWasReceived(_ notification: [String: AnyObject]) async throws { }
 
     public func uploadPumpSnapshot(basal: [DoseEntry], boluses: [DoseEntry], carbs: [SyncCarbObject],
-                                   now: Date = Date(),
+                                   now: Date = Date(), isBackfill: Bool = false,
                                    completion: @escaping (Result<Bool, Error>) -> Void) {
         // Classic receives boluses through its incremental dose endpoint. Include boluses here
         // only for XT, where the pump snapshot is their only upload path.
@@ -181,6 +184,7 @@ extension GlookoService: RemotePumpSnapshotService {
         run(completion, record: { stats in
             stats.doses += snapshotBoluses.count
             stats.carbs += carbs.count
+            if isBackfill { stats.pumpSnapshotBackfilled = true }
         }) {
             try await $0.uploadPumpSnapshot(basal: basal, boluses: snapshotBoluses, carbs: carbs, now: now)
         }
