@@ -121,7 +121,7 @@ public final class GlookoService: Service, ObservableObject {
     }
 }
 
-extension GlookoService: RemoteDataService {
+extension GlookoService: RemotePumpSnapshotService {
 
     public var glucoseDataLimit: Int? { 1000 }
     public var doseDataLimit: Int? { 1000 }
@@ -175,11 +175,14 @@ extension GlookoService: RemoteDataService {
     public func uploadPumpSnapshot(basal: [DoseEntry], boluses: [DoseEntry], carbs: [SyncCarbObject],
                                    now: Date = Date(),
                                    completion: @escaping (Result<Bool, Error>) -> Void) {
+        // Classic receives boluses through its incremental dose endpoint. Include boluses here
+        // only for XT, where the pump snapshot is their only upload path.
+        let snapshotBoluses = configuration.variant == .classic ? [] : boluses
         run(completion, record: { stats in
-            stats.doses += boluses.count
+            stats.doses += snapshotBoluses.count
             stats.carbs += carbs.count
         }) {
-            try await $0.uploadPumpSnapshot(basal: basal, boluses: boluses, carbs: carbs, now: now)
+            try await $0.uploadPumpSnapshot(basal: basal, boluses: snapshotBoluses, carbs: carbs, now: now)
         }
     }
 
